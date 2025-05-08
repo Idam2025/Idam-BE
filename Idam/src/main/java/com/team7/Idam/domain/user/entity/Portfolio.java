@@ -4,7 +4,11 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "portfolio")
+@Table(
+        name = "portfolio",
+        // 학생별 동일 포트폴리오 추가 방지
+        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "portfolio"})}
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,5 +26,5 @@ public class Portfolio {
     private Student student;
 
     @Column(length = 255, nullable = false)
-    private String portfolio; // 실제 저장된 파일 경로나 URL
+    private String portfolio;
 }

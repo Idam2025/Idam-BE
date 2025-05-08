@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface PortfolioRepository extends JpaRepository<Portfolio, Long> {
-    List<Portfolio> findByStudentId(Long studentId);
+    boolean existsByStudentIdAndPortfolio(Long studentId, String portfolio);
 }

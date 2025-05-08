@@ -1,5 +1,7 @@
 package com.team7.Idam.jwt;
 
+import com.team7.Idam.domain.user.entity.User;
+import com.team7.Idam.domain.user.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -11,7 +13,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
 
 /*
     JWT 사용자 인증 필터
@@ -20,29 +21,27 @@ import java.util.Collections;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        String uri = request.getRequestURI();
-
-        // ✅ /api/refresh, /api/logout, /api/login, api/signup 경로는 accessToken 검증 스킵
-        if (uri.startsWith("/api/refresh") || uri.startsWith("/api/logout") ||
-                uri.startsWith("/api/login") || uri.startsWith("/api/signup")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
         String token = resolveToken(request);
 
         if (token != null && jwtTokenProvider.validateToken(token)) { // NotNull, 토큰 유효 시
             Long userId = jwtTokenProvider.getUserIdFromToken(token);
+            // Claims -> userId, username, role, email 같은 정보들이 담겨있음.
             Claims claims = jwtTokenProvider.getClaims(token);
 
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+            CustomUserDetails customUserDetails = new CustomUserDetails(user);
+
             UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
+                    new UsernamePasswordAuthenticationToken(customUserDetails, null, customUserDetails.getAuthorities());
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }

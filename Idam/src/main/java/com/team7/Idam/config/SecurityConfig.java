@@ -1,6 +1,6 @@
 package com.team7.Idam.config;
 
-import com.team7.Idam.jwt.JwtRefreshAuthenticationFilter;
+import com.team7.Idam.domain.user.repository.UserRepository;
 import com.team7.Idam.jwt.JwtTokenProvider;
 import com.team7.Idam.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
 
     // BCrypt >> 비밀번호를 "단방향 해시"로 안전하게 변환해주는 암호화 알고리즘
     @Bean
@@ -26,24 +27,23 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    // SecurityFilterChain
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // accessToken 검증 필터 (refresh, logout 경로는 검증 스킵하도록 내부에 작성함)
-        JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtTokenProvider);
-        // refreshToken 검증 필터 (refresh, logout 경로만 검증하도록 내부에 작성함)
-        JwtRefreshAuthenticationFilter jwtRefreshAuthenticationFilter = new JwtRefreshAuthenticationFilter(jwtTokenProvider);
-
         return http
+                // CSRF 토큰 검증 비활성화(-> JWT토큰으로 대체)
                 .csrf(csrf -> csrf.disable())
+                // 경로별로 접근 허용 여부 설정
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/signup/**", "/api/login/**").permitAll()
-                        .requestMatchers("/api/refresh", "/api/logout").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers(
+                                "/api/signup/**",   // 회원가입 허용
+                                "/api/login/**",    // 로그인 허용
+                                "/api/refresh"      // 토큰 재발급 허용
+                        ).permitAll() // 누구나 요청 허용
+                        .anyRequest().authenticated()  // 나머지는 인증 필요
                 )
-                // refreshToken 검증 필터 → accessToken 검증 필터보다 먼저 동작
-                .addFilterBefore(jwtRefreshAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                // accessToken 검증 필터 (refresh, logout 경로는 이 필터 안에서 스킵)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // 기본 필터 앞에 JWT 검증 필터 삽입
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, userRepository), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
